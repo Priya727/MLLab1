@@ -1,23 +1,3 @@
----
-title: "Machine Learning Lab1"
-author: "Lepeng Zhang, Xuan Wang, Priyarani Patil"
-date: "2023-11-08"
-output: 
-  pdf_document:
-    latex_engine: xelatex
----
-
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
-```
-
-# Assignment 1. Handwritten digit recognition with Knearest neighbors.
-
-*1.Import the data into R and divide it into training, validation and test sets (50%/25%/25%) by using the partitioning principle specified in the lecture slides.*
-
-\textcolor{red}{Answer:}
-
-```{r, knearest1, echo = FALSE}
 # load necessary libraries
 library(ggplot2)
 library(kknn)
@@ -26,7 +6,7 @@ library(kknn)
 optdigits_data <- read.csv('optdigits.csv', header = FALSE)
 colnames(optdigits_data) <- c(paste0("a",1:64),"digit")
 optdigits_data$digit <- as.factor(optdigits_data$digit)
-#head(optdigits_data, 5)
+head(optdigits_data, 5)
 
 n=dim(optdigits_data)[1]
 set.seed(12345)
@@ -38,13 +18,7 @@ valid_data=optdigits_data[id2,]
 id3=setdiff(id1,id2)
 test_data=optdigits_data[id3,]
 
-```
 
-*2.Use training data to fit 30-nearest neighbor classifier with function kknn() and kernel=”rectangular” from package kknn and estimate • Confusion matrices for the training and test data (use table()) • Misclassification errors for the training and test data Comment on the quality of predictions for different digits and on the overall prediction quality.*
-
-\textcolor{red}{Answer:}
-
-```{r, knearest2, echo = FALSE}
 # 30-nearest neighbor classification
 k_fit_train <- kknn(formula = digit ~ ., train_data, train_data, k = 30, kernel = "rectangular")
 k_fit_test <- kknn(formula = digit ~ ., train_data, test_data, k = 30, kernel = "rectangular")
@@ -75,14 +49,6 @@ for ( i in 1:nrow(test_confusion)) {
 overall_accuracy <- sum(diag(test_confusion)) / sum(test_confusion)
 cat("The overall accuracy of prediction is:", overall_accuracy, "\n")
 
-```
-
-
-*3.Find any 2 cases of digit “8” in the training data which were easiest to classify and 3 cases that were hardest to classify (i.e. having highest and lowest probabilities of the correct class). Reshape features for each of these cases as matrix 8x8 and visualize the corresponding digits (by using e.g. heatmap() function with parameters Colv=NA and Rowv=NA) and comment on whether these cases seem to be hard or easy to recognize visually.*
-
-\textcolor{red}{Answer:}
-
-```{r, knearest3, echo = FALSE}
 # Get probabilities of class "8"
 probabilities <- k_fit_train$prob[,"8"]
 
@@ -102,33 +68,27 @@ for (index in c(easiest_indices, hardest_indices)) {
   heatmap(digit_8, Colv = NA, Rowv = NA, main = paste("Digit '8', Index:", index))
 }
 
-```
 
-
-*4.Fit a K-nearest neighbor classifiers to the training data for different values of 𝐾 = 1,2, … , 30 and plot the dependence of the training and validation misclassification errors on the value of K (in the same plot). How does the model complexity change when K increases and how does it affect the training and validation errors? Report the optimal 𝐾 according to this plot. Finally, estimate the test error for the model having the optimal K, compare it with the training and validation errors and make necessary conclusions about the model quality.*
-
-\textcolor{red}{Answer:}
-
-```{r, knearest4, echo = FALSE}
 # Fit KNN for different K values and plot errors
 errors <- data.frame()
+
+# Loop over different values of K
 for (k in 1:30) {
   fit <- kknn(digit ~ ., train_data, valid_data, k = k, kernel = "rectangular")
+
   pred <- fit$fitted.values
+
   confusion_matrix <- table(valid_data$digit, pred)
+
   error <- 1 - sum(diag(confusion_matrix)) / sum(confusion_matrix)
-  errors <- rbind(errors, data.frame(K = k, Error = error))
+
+  errors <- rbind(errors, data.frame(k_value = k, mis_error = error))
 }
 # Plot the misclassification errors on the value of K
-plot(errors$K, errors$Error, type = "b", col='orange', main="Misclassification errors on the value of K", xlab = "K value", ylab = "error")
+plot(errors$k_value, errors$mis_error, type = "b", col='orange', main="Misclassification Error vs. K for K-Nearest Neighbors", xlab = "K (Number of Neighbors)", ylab = "error")
 
-```
 
-*5.Fit K-nearest neighbor classifiers to the training data for different values of 𝐾 = 1,2, … , 30, compute the error for the validation data as cross-entropy ( when computing log of probabilities add a small constant within log, e.g. 1e-15, to avoid numerical problems) and plot the dependence of the validation error on the value of 𝐾. What is the optimal 𝐾 value here? Assuming that response has multinomial distribution, why might the cross-entropy be a more suitable choice of the error function than the misclassification error for this problem?*
 
-\textcolor{red}{Answer:}
-
-```{r, knearest5, echo = FALSE}
 # Initialize a data frame to store the results
 ce_errors <- data.frame(k_value = integer(), cross_entropy_error = numeric())
 
@@ -148,26 +108,10 @@ for (k in 1:30) {
 }
 
 # Plot the results
-plot(ce_errors$k_value, ce_errors$cross_entropy_error, type = "b", col='orange', main="Cross Entropy errors on the value of K", xlab = "K value", ylab = "Cross Entropy error")
+plot(ce_errors$k_value, ce_errors$cross_entropy_error, type = "b", col='orange', main="Cross Entropy Error vs. K for K-Nearest Neighbors", xlab = "K (Number of Neighbors)", ylab = "Cross Entropy error")
 
 # Find the optimal K
 optimal_k <- ce_errors$k_value[which.min(ce_errors$cross_entropy_error)]
 cat("The optimal k is:", optimal_k, "\n")
-```
 
-
-
-# Assignment 2. Linear regression and ridge regression
-
-
-# Assignment 3. Logistic regression and basis function expansion
-
-
-# Appendix: 
-
-knearest.R
-
-```{r ref.label=c('knearest1', 'knearest2', 'knearest3', 'knearest4', 'knearest5'), echo=TRUE, eval=FALSE}
-
-```
 

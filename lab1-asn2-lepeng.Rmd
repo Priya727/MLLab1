@@ -1,0 +1,125 @@
+---
+title: "lab1-asn2"
+author: "Lepeng Zhang"
+date: "`r Sys.Date()`"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Assignment 2. Linear regression and ridge regression  
+### 1
+```{r}
+rawdata <- read.csv("parkinsons.csv")
+library(dplyr)
+rawdata <- rawdata %>% select(-c(1:4,6))
+n <- nrow(rawdata)
+set.seed(12345)
+id <- sample(1:n,floor(n*0.6))
+train <- rawdata[id,]
+test <- rawdata[-id,]
+
+library(caret)
+param <- preProcess(train)
+train_scaled <- predict(param,train)
+test_scaled <- predict(param,test)
+```
+### 2
+```{r}
+mse <- function(true_value, predict_value){
+  mean((true_value - predict_value)^2)
+}
+
+model <- lm(motor_UPDRS ~ ., data = train_scaled)
+
+train_mse <- mse(train_scaled$motor_UPDRS, predict(model, train_scaled))
+cat(paste0("Training MSE is: ",train_mse,".\n"))
+
+test_mse <- mse(test_scaled$motor_UPDRS, predict(model, test_scaled))
+cat(paste0("Test MSE is: ",test_mse,".\n"))
+
+summary(model)
+```
+The significant contributors are Jitter.Abs., Shimmer.APQ5, Shimmer.APQ11, NHR, HNR, DFA, and PPE, which are marked $***$ in summary output.
+
+### 3
+```{r}
+Loglikelihood <- function(theta_vec, sigma){
+  y <- train_scaled[,1]
+  x <- as.matrix(train_scaled[,-1])
+  n <- nrow(train_scaled)
+  value <- -(n/2*log(sigma^2*2*pi)+sum((y-x%*%theta_vec)^2)/(2*sigma^2))
+  return(value)
+}
+
+Ridge <- function(theta_vec, sigma, lambda){
+  -Loglikelihood(theta_vec, sigma)+lambda*sum(theta_vec^2)
+}
+
+RidgeOpt <- function(lambda){
+  init_theta <- rep(0, ncol(train_scaled)-1)
+  init_sigma <- 0.9
+  
+  objective_function <- function(params) {
+    theta_vec <- params[-length(params)]  
+    sigma <- params[length(params)]  
+    return(Ridge(theta_vec, sigma, lambda))
+  }
+  
+  rlt <- optim(c(init_theta, init_sigma), fn = objective_function, method = "BFGS")
+  
+  optimal_theta_vec <- rlt$par[-length(rlt$par)]
+  optimal_sigma <- rlt$par[length(rlt$par)]
+  
+  return(list(theta_vec = optimal_theta_vec, sigma = optimal_sigma))
+}
+
+DF <- function(lambda){
+  x <- as.matrix(train_scaled[,-1])
+  df <- sum(diag(x%*%solve(t(x)%*%x+lambda*diag(ncol(x)))%*%t(x)))
+  return(df)
+}
+```
+
+### 4
+```{r}
+train_x <- as.matrix(train_scaled[,-1])
+train_y <- train_scaled[,1]
+test_x <- as.matrix(test_scaled[,-1])
+test_y <- test_scaled[,1]
+```
+
+```{r}
+Lambda <- c(1,100,1000)
+store_list <- list()
+
+for (i in 1:length(Lambda)){
+  store_list$lambda[i] <- Lambda[i]
+  optimal_theta_vec <- RidgeOpt(Lambda[i])$theta_vec
+  store_list$train_MSE[i] <- mse(train_y, train_x%*%optimal_theta_vec)
+  store_list$test_MSE[i] <- mse(test_y, test_x%*%optimal_theta_vec)
+  store_list$DoF[i] <- DF(Lambda[i])
+  store_list$sigma[i] <- RidgeOpt(Lambda[i])$sigma
+}
+store_df <- as.data.frame(store_list)
+print(store_df)
+```
+
+As the table shown, train_MSE increases slightly as $\lambda$ increases, while test_MSE reaches minimum at $\lambda = 100$, which is regarded as the optimal penalty parameter among these three.  
+Larger $\lambda$ results to smaller DoF. Therefore, effects of DoF on models can be viewed as the opposite of effects of $\lambda$ on them. When $\lambda$ increases (DoF decreases), model becomes simpler; when $\lambda$ decreases (DoF increases), model becomes more complex. Since there is a trade-off of model complexity for the best model, there exists optimal values of $\lambda$ and DoF.
+
+```{r}
+# Just for showing the inversely proportional relationship between lambda and DoF.
+lam <- seq(0,1000,by=50)
+dof <- c()
+for (i in 1:length(lam)){
+  dof[i] <- DF(lam[i])
+}
+plot(lam,dof)
+```
+
+
+
+

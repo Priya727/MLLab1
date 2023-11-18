@@ -1,0 +1,317 @@
+---
+title: "Machine Learning Lab1"
+author: "Lepeng Zhang, Xuan Wang, Priyarani Patil"
+date: "2023-11-17"
+output: 
+  pdf_document:
+    latex_engine: xelatex
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Assignment 1. Handwritten digit recognition with K-nearest neighbors.
+### Q1
+See appendix.
+```{r, knearest1, echo = FALSE}
+rawdata <- read.csv("optdigits.csv", header = F)
+n <- nrow(rawdata)
+set.seed(12345)
+id <- sample(1:n,floor(n*0.5))
+id1 <- setdiff(1:n,id)
+id2 <- sample(id1,floor(n*0.25))
+id3 <- setdiff(id1,id2)
+
+train <- rawdata[id,]
+valid <- rawdata[id2,]
+test <- rawdata[id3,]
+```
+
+### Q2
+```{r, knearest2, echo = FALSE}
+suppressWarnings({
+  library(kknn)
+})
+m1 <- kknn(as.factor(train$V65)~.,train,train,k=30,kernel="rectangular")
+train_true <- train$V65
+train_predict <- m1$fitted.values
+train_table <- table(train_true, train_predict)
+cat("Confusion matrix for the training data:\n")
+print(train_table)
+
+m2 <- kknn(as.factor(train$V65)~.,train,test,k=30,kernel="rectangular")
+test_true <- test$V65
+test_predict <- m2$fitted.values
+test_table <- table(test_true, test_predict)
+cat("Confusion matrix for the test data:\n")
+print(test_table)
+
+train_mis <- 1-sum(diag(train_table))/sum(train_table)
+cat(paste0("Misclassification error for the training data: ",round(train_mis,5),"\n"))
+
+test_mis <- 1-sum(diag(test_table))/sum(test_table)
+cat(paste0("Misclassification error for the test data: ",round(test_mis,5),"\n"))
+
+error_list <- list()
+for (i in 1:10){
+  error_Rate <- 1-test_table[i,i]/sum(test_table[i,])
+  error_list$digit[i] <- i-1
+  error_list$error_rate[i] <- error_Rate
+}
+error_df <- as.data.frame(error_list)
+error_df <- error_df[order(error_df$error,decreasing = T),]
+cat("Misclassification error for each digit in the test data:\n")
+print(error_df)
+```
+
+The model predicts 4 worst with 12.7 % error rate and predicts 6 best with 100 % accuracy. Both error rates for 4 and 5 are over 10 %, and error rates for 8, 3, 9, 1 are over 5 %. While, error rates for 2, 0, 7, 6 are below 5 %. Note that these error rates are computed based on the predictions on the test data.
+
+Besides, misclassification error for the test data is 5.852 %. It is not bad but still has improvement room.
+
+### Q3
+```{r, knearest3, echo = FALSE, fig.width=3, fig.height=4}
+correct_index <- which(train_predict==8 & train_true==8)
+
+correst_prob <- m1$prob[correct_index,9]
+
+easy_index <- order(correst_prob, decreasing = TRUE)[1:2]
+hard_index <- order(correst_prob)[1:3]
+
+for (i in 1:length(easy_index)){
+  df <- train[correct_index[easy_index[i]],-ncol(train)]
+  mat <- matrix(as.numeric(df),8,byrow = T)
+  heatmap(mat, Colv=NA, Rowv=NA, main=paste0("Easiest_", i))
+}
+
+for (i in 1:length(hard_index)){
+  df <- train[correct_index[hard_index[i]],-ncol(train)]
+  mat <- matrix(as.numeric(df),8,byrow = T)
+  heatmap(mat, Colv=NA, Rowv=NA, main=paste0("Hardest_", i))
+}
+```
+
+The two cases in the easiest group are easy to recognize as 8 visually. While, for the first two cases in the hardest group, they can recognize 8 roughly. But for the third one, it is quite hard to tell what digit it is.
+
+### Q4
+```{r, knearest4, echo = FALSE}
+store_list <- list()
+for (i in 1:30){
+  store_list$K[i] <- i
+  train_model <- kknn(as.factor(train$V65)~.,train,train,k=i,kernel="rectangular")
+  train_table <- table(train$V65,train_model$fitted.values)
+  store_list$train_error[i] <- 1-sum(diag(train_table))/sum(train_table)
+  
+  valid_model <- kknn(as.factor(train$V65)~.,train,valid,k=i,kernel="rectangular")
+  valid_table <- table(valid$V65,valid_model$fitted.values)
+  store_list$valid_error[i] <- 1-sum(diag(valid_table))/sum(valid_table)
+}
+store_df <- as.data.frame(store_list)
+
+plot(store_df$K, store_df$train_error, type = "l", col = "blue", lty = 1, lwd = 2, ylim = range(c(store_df$train_error, store_df$valid_error)), xlab = "K_value", ylab = "Misclassification error")
+lines(store_df$K, store_df$valid_error, col = "red", lty = 2, lwd = 2)
+legend("bottomright", legend = c("train", "valid"), col = c("blue", "red"), lty = 1:2, lwd = 2)
+```
+
+When K increases, the model becomes less complex, as the predictions are based on a majority vote from more neighbors.  
+In general, the training error increases with the increase of $K$ after $K = 2$, while the rate of increase gradually decreases. For validation error, it decreases at first and reaches the minimum at $K = 3$ and then increases with the increase of $K$. These relationships indirectly indicate that larger $K$ leads to simpler model.       
+According to this plot, the optimal $K = 3$.  
+
+```{r, knearest41, echo = FALSE}
+
+m3 <- kknn(as.factor(train$V65)~.,train,test,k=3,kernel="rectangular")
+test_true <- test$V65
+test_predict <- m3$fitted.values
+test_table <- table(test_true, test_predict)
+test_error <- 1-sum(diag(test_table))/sum(test_table)
+cat(paste0("Misclassification error for the test data: ",test_error))
+
+errors <- cbind(store_df[3,],test_error)
+print(errors)
+```
+
+It can be computed that test_error is 1.76 times of valid_error and 2.72 times of train_error. In other words, test_error is quite larger than the other two errors. Nonetheless, the absolute value of test_error is small. Therefore, this model has a good prediction quality.
+
+### Q5
+
+```{r, knearest5, echo = FALSE}
+compute_cross_entropy <- function(true_labels, predicted_probs) {
+  -sum(log(predicted_probs[cbind(1:length(true_labels), true_labels + 1)] + 1e-15))
+}
+
+store_list <- list()
+for (i in 1:30){
+  store_list$K[i] <- i
+  valid_model <- kknn(as.factor(train$V65)~.,train,valid,k=i,kernel="rectangular")
+  store_list$valid_error[i] <- compute_cross_entropy(valid$V65,valid_model$prob)
+}
+
+store_df <- as.data.frame(store_list)
+plot(store_df$K, store_df$valid_error, xlab = "K value", ylab = "Validation error")
+```
+
+The optimal $K = 5$ since validation error reaches minimum here.  
+
+In a multinomial classification task, misclassification error cannot reflect the extent of mistakes. Specifically, when an observation is misclassified, the number of misclassified cases, which is used to compute the misclassification error, will always add 1 no matter how large the probability that the model calculates about this observation is.  
+
+However, cross-entropy can reflect the extent of mistakes by function $-log(probability)$. For example, two observations are mislassified with probabilities of 0.1 and 0.2, repectively. Their contributions to the whole cross-entropy are different. And this difference provides a better capability of measuring the quality of the model.
+
+# Assignment 2. Linear regression and ridge regression
+### Q1
+
+See appendix.
+```{r, linear_ridge1, echo = FALSE}
+# load necessary package
+library(caret)
+library(dplyr)
+# import data
+rawdata <- read.csv("parkinsons.csv")
+
+rawdata <- rawdata %>% select(-c(1:4,6))
+n <- nrow(rawdata)
+set.seed(12345)
+id <- sample(1:n,floor(n*0.6))
+train <- rawdata[id,]
+test <- rawdata[-id,]
+
+# scale data
+param <- preProcess(train)
+train_scaled <- predict(param,train)
+test_scaled <- predict(param,test)
+```
+
+### Q2
+
+```{r, linear_ridge2, echo = FALSE}
+# calculate mse
+mse <- function(true_value, predict_value){
+  mean((true_value - predict_value)^2)
+}
+
+# linear regression model
+model <- lm(motor_UPDRS ~ ., data = train_scaled)
+
+# Training and test MSE
+train_mse <- mse(train_scaled$motor_UPDRS, predict(model, train_scaled))
+cat(paste0("Training MSE is: ",train_mse,".\n"))
+
+test_mse <- mse(test_scaled$motor_UPDRS, predict(model, test_scaled))
+cat(paste0("Test MSE is: ",test_mse,".\n"))
+
+# Significant variables
+summary(model)
+
+```
+
+The significant contributors are Jitter.Abs., Shimmer.APQ5, Shimmer.APQ11, NHR, HNR, DFA, and PPE, which are marked $***$ in summary output.
+
+### Q3
+
+See appendix.
+```{r, linear_ridge3, echo = FALSE}
+# Log-likelihood function
+Loglikelihood <- function(theta_vec, sigma){
+  y <- train_scaled[,1]
+  x <- as.matrix(train_scaled[,-1])
+  n <- nrow(train_scaled)
+  value <- -(n/2*log(sigma^2*2*pi)+sum((y-x%*%theta_vec)^2)/(2*sigma^2))
+  return(value)
+}
+# Ridge log-likelihood function
+Ridge <- function(theta_vec, sigma, lambda){
+  -Loglikelihood(theta_vec, sigma)+lambda*sum(theta_vec^2)
+}
+# Ridge log-likelihood optimization function
+RidgeOpt <- function(lambda){
+  init_theta <- rep(0, ncol(train_scaled)-1)
+  init_sigma <- 0.9
+  
+  objective_function <- function(params) {
+    theta_vec <- params[-length(params)]  
+    sigma <- params[length(params)]  
+    return(Ridge(theta_vec, sigma, lambda))
+  }
+  
+  rlt <- optim(c(init_theta, init_sigma), fn = objective_function, method = "BFGS")
+  
+  optimal_theta_vec <- rlt$par[-length(rlt$par)]
+  optimal_sigma <- rlt$par[length(rlt$par)]
+  
+  return(list(theta_vec = optimal_theta_vec, sigma = optimal_sigma))
+}
+# Degrees of freedom function
+DF <- function(lambda){
+  x <- as.matrix(train_scaled[,-1])
+  df <- sum(diag(x%*%solve(t(x)%*%x+lambda*diag(ncol(x)))%*%t(x)))
+  return(df)
+}
+```
+
+### Q4
+
+```{r, linear_ridge4, echo = FALSE}
+train_x <- as.matrix(train_scaled[,-1])
+train_y <- train_scaled[,1]
+test_x <- as.matrix(test_scaled[,-1])
+test_y <- test_scaled[,1]
+
+# Ridge optimization for different lambdas
+Lambda <- c(1,100,1000)
+store_list <- list()
+
+for (i in 1:length(Lambda)){
+  store_list$lambda[i] <- Lambda[i]
+  optimal_theta_vec <- RidgeOpt(Lambda[i])$theta_vec
+  store_list$train_MSE[i] <- mse(train_y, train_x%*%optimal_theta_vec)
+  store_list$test_MSE[i] <- mse(test_y, test_x%*%optimal_theta_vec)
+  store_list$DoF[i] <- DF(Lambda[i])
+  store_list$sigma[i] <- RidgeOpt(Lambda[i])$sigma
+}
+store_df <- as.data.frame(store_list)
+print(store_df)
+
+```
+
+As the table shown, train_MSE increases slightly as $\lambda$ increases, while test_MSE reaches minimum at $\lambda = 100$, which is regarded as the optimal penalty parameter among these three.  
+Larger $\lambda$ results to smaller DoF. As $\lambda$ increases, the parameters are heavily constrained and the degrees of freedom will effectively be lower, tending to 0 as $\lambda → ∞$ . In summary, $\lambda$ controls the complexity of the model, when it increases (DoF decreases), model becomes simpler; when it decreases (DoF increases), model becomes more complex. Since there is a trade-off of model complexity for the best model, there exists optimal values of $\lambda$ and DoF.
+
+# Appendix
+## Code for Assignment 1
+### Q1
+```{r ref.label=c('knearest1'), echo=TRUE, eval=FALSE}
+
+```
+### Q2
+```{r ref.label=c('knearest2'), echo=TRUE, eval=FALSE}
+
+```
+### Q3
+```{r ref.label=c('knearest3'), echo=TRUE, eval=FALSE}
+
+```
+### Q4
+```{r ref.label=c('knearest4','knearest41'), echo=TRUE, eval=FALSE}
+
+```
+### Q5
+```{r ref.label=c('knearest5'), echo=TRUE, eval=FALSE}
+
+```
+
+## Code for Assignment 2
+### Q1
+```{r ref.label=c('linear_ridge1'), echo=TRUE, eval=FALSE}
+
+```
+### Q2
+```{r ref.label=c('linear_ridge2'), echo=TRUE, eval=FALSE}
+
+```
+### Q3
+```{r ref.label=c('linear_ridge3'), echo=TRUE, eval=FALSE}
+
+```
+### Q4
+```{r ref.label=c('linear_ridge4'), echo=TRUE, eval=FALSE}
+
+```

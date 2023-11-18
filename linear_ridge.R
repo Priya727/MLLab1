@@ -5,6 +5,7 @@ head(parkinson_data, 5)
 #parkinson_data <- scale(parkinson_data)
 
 # Split the data into training and test sets
+parkinson_data <- subset(parkinson_data, select = -c(1:4,6))
 n=dim(parkinson_data)[1]
 set.seed(12345)
 id=sample(1:n, floor(n*0.6))
@@ -12,8 +13,13 @@ train_data=parkinson_data[id,]
 test_data=parkinson_data[-id,]
 
 # Scale the data
-scaled_train_data <- as.data.frame(cbind(scale(subset(train_data, select = -c(motor_UPDRS))), motor_UPDRS=train_data$motor_UPDRS))
-scaled_test_data <- as.data.frame(cbind(scale(subset(test_data, select = -c(motor_UPDRS))), motor_UPDRS=test_data$motor_UPDRS))
+#scaled_train_data <- as.data.frame(cbind(scale(subset(train_data, select = -c(motor_UPDRS))), motor_UPDRS=train_data$motor_UPDRS))
+#scaled_test_data <- as.data.frame(cbind(scale(subset(test_data, select = -c(motor_UPDRS))), motor_UPDRS=test_data$motor_UPDRS))
+
+scaled_train_data <- as.data.frame(scale(train_data))
+scaled_test_data <- as.data.frame(scale(test_data))
+
+
 
 # linear regression model
 lm_model <- lm(motor_UPDRS ~ ., data = scaled_train_data)

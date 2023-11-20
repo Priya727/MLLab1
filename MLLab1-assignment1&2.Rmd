@@ -275,6 +275,195 @@ print(store_df)
 As the table shown, train_MSE increases slightly as $\lambda$ increases, while test_MSE reaches minimum at $\lambda = 100$, which is regarded as the optimal penalty parameter among these three.  
 Larger $\lambda$ results to smaller DoF. As $\lambda$ increases, the parameters are heavily constrained and the degrees of freedom will effectively be lower, tending to 0 as $\lambda → ∞$ . In summary, $\lambda$ controls the complexity of the model, when it increases (DoF decreases), model becomes simpler; when it decreases (DoF increases), model becomes more complex. Since there is a trade-off of model complexity for the best model, there exists optimal values of $\lambda$ and DoF.
 
+
+
+# Assignment 3. Logistic regression and basis function expansion
+###Q1
+
+```{r logistics1, echo = FALSE}
+
+library("ggplot2")
+#data in the form of dataframe
+data <- read.csv("pima-indians-diabetes.csv")
+#Modifying column names
+colnames(data)[c(2,8,9)]<-c('PlasmaGlucoseConcentration','Age','Diabetes')
+
+data$Diabetes <- as.factor(data$Diabetes)
+plot1<- ggplot(data=data, aes(x=Age,y=PlasmaGlucoseConcentration))+geom_point(aes(col=Diabetes))
+print(plot1)
+
+
+```
+
+The logistic regression model can effectively classify diabetes using these two variables. This conclusion is drawn from the plot, which indicates that individuals with an age less than 35 years and a Plasma Glucose Concentration below 150 are less tendency to having diabetes.
+
+
+
+
+###Q2
+
+
+```{r logistics2, echo = FALSE}
+#training a Logistic Regression model
+trained_model <- glm(Diabetes ~ PlasmaGlucoseConcentration + Age, data = data, family= "binomial")
+#prediction of all observations
+prediction<- predict(trained_model, data, type = "response")
+prediction1<- ifelse(prediction>0.5,1,0)
+
+trained_model$coefficients
+```
+
+
+
+
+\[ p(\text{Diabetes} = 1) = \frac{1}{1 + e^{-5.89785793 + 0.03558250 \times \text{PlasmaGlucoseConcentration} + 0.02450157 \times \text{Age}}} \]
+
+
+
+**Misclassification error**
+
+
+```{r }
+#Model accuracy using confusion matrix
+table(data$Diabetes,prediction1)
+```
+
+```{r }
+#A function to calculate misclassification error
+missclass<- function(pred,actual){
+ n=length(pred)
+ return(1-sum(diag(table(pred, actual)))/n)
+}
+#Computing misclassification error for r= 0.5
+missclass(data$Diabetes,prediction1)
+```
+
+```{r }
+#scatter plot with predicted values of diabetes
+data$PredictedDiabetes <- as.factor(prediction1)
+plot2<- ggplot(data=data, aes(x=Age,y=PlasmaGlucoseConcentration))+geom_point(aes(col=PredictedDiabetes))
+print(plot2)
+```
+
+Analyzing the misclassification error reveals that approximately 26% of observations are inaccurately classified. 
+The graphical representation indicates accurate classification for individuals with a Plasma Glucose Concentration below 150 and an age below 35 years.However, individuals aged above 35 years tend to be predominantly misclassified.
+
+
+
+###Q3
+
+```{r logistics3, echo = FALSE}
+#plotting the boundaries
+Ag1<-15:85 #considering Age as Ag1 
+Ag2<-(5.89785793/0.03558250)-(0.02450157/0.03558250)*Ag1 # #taking Plasma Glucose as Ag2
+boundary_df<-data.frame(Ag1,Ag2 )
+plot3<-plot2 + geom_line(data = boundary_df, aes(x=Ag1,y=Ag2))
+print(plot3)
+
+```
+
+
+The decision boundary inadequately captures the distribution 
+of the data, as numerous points indicating diabetes are scattered on both sides of the line.
+
+
+##Q4
+
+
+```{r logistics4, echo = FALSE}
+#prediction with r=0.2
+prediction2<- ifelse(prediction>0.2,1,0)
+data$PredictedDiabetes2 <- as.factor(prediction2)
+
+
+#Computing model accuracy using confusion matrix
+table(data$Diabetes,prediction2)
+
+```
+
+```{r }
+#Computing misclassification error
+missclass(data$Diabetes,prediction2)
+```
+
+
+```{r }
+#scatter plot of classification with r=0.2
+plot4<- ggplot(data=data, aes(x=Age,y=PlasmaGlucoseConcentration))+geom_point(aes(col=PredictedDiabetes2))
+plot4<-plot4 + geom_line(data = boundary_df, aes(x=Ag1,y=Ag2))
+print(plot4)
+```
+
+
+
+```{r }
+#prediction with r=0.8
+prediction3<- ifelse(prediction>0.8,1,0)
+data$PredictedDiabetes3 <- as.factor(prediction3)
+
+#Computing model accuracy using confusion matrix
+table(data$Diabetes,prediction3)
+
+```
+
+```{r }
+#Computing misclassification error
+missclass(data$Diabetes,prediction3)
+```
+
+
+
+```{r }
+#scatter plot of classification with r=0.8
+plot5<- ggplot(data=data, aes(x=Age,y=PlasmaGlucoseConcentration))+geom_point(aes(col=PredictedDiabetes3))
+plot5<-plot5 + geom_line(data = boundary_df, aes(x=Ag1,y=Ag2))
+print(plot5)
+```
+
+
+The models with correlation coefficients of 0.2 and 0.8 have misclassified a substantial number of observations when contrasted with the model having a correlation coefficient of 0.5. Specifically, the model with a correlation coefficient of 0.2 has erroneously labeled numerous non-diabetic individuals as diabetic,while the model with a correlation coefficient of 0.8 has misclassified many diabetic individuals as non-diabetic.
+
+
+##Q5
+
+```{r logistics5, echo = FALSE}
+#computing and adding new features to the data set
+data$z1<-data$PlasmaGlucoseConcentration^4
+data$z2<-(data$PlasmaGlucoseConcentration^3)*(data$Age)
+data$z3<-(data$PlasmaGlucoseConcentration^2)*(data$Age^2)
+data$z4<-(data$PlasmaGlucoseConcentration)*(data$Age^3)
+data$z5<-data$Age^4
+new_train_model <- glm(Diabetes ~ PlasmaGlucoseConcentration+Age+z1+z2+z3+z4+z5, data = data, family= "binomial")
+new_prediction<- predict(new_train_model, data, type = "response")
+new_prediction<- ifelse(new_prediction>0.5,1,0)
+```
+
+```{r }
+#accuracy using confusion matrix
+table(data$Diabetes,new_prediction)
+```
+
+```{r }
+#misclassification error
+missclass(data$Diabetes,new_prediction)
+```
+
+
+
+```{r }
+#scatter plot of classification with new features
+data$NewPredictedDiabetes <- as.factor(new_prediction)
+plot6<- ggplot(data=data, aes(x=Age,y=PlasmaGlucoseConcentration))+geom_point(aes(col=NewPredictedDiabetes))
+print(plot6)
+
+```
+
+
+
+In comparison to the preceding model, the misclassification error in this model is lower, indicating its superiority. Notably,the decision boundary in this model exhibits curvature, taking on a parabolic shape,whereas the decision boundary.
+
+
+
 # Appendix
 ## Code for Assignment 1
 ### Q1
@@ -313,5 +502,28 @@ Larger $\lambda$ results to smaller DoF. As $\lambda$ increases, the parameters 
 ```
 ### Q4
 ```{r ref.label=c('linear_ridge4'), echo=TRUE, eval=FALSE}
+
+```
+
+
+## Code for Assignment 3
+### Q1
+```{r ref.label=c('logistics1'), echo=TRUE, eval=FALSE}
+
+```
+### Q2
+```{r ref.label=c('logistics2'), echo=TRUE, eval=FALSE}
+
+```
+### Q3
+```{r ref.label=c('logistics3'), echo=TRUE, eval=FALSE}
+
+```
+### Q4
+```{r ref.label=c('logistics4'), echo=TRUE, eval=FALSE}
+
+```
+### Q5
+```{r ref.label=c('logistics5'), echo=TRUE, eval=FALSE}
 
 ```
